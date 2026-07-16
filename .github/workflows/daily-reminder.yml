@@ -1,0 +1,22 @@
+name: 会议每日提醒
+
+on:
+  schedule:
+    # UTC 0:00 = 北京时间 8:00
+    # 每天运行，代码自动判断：
+    #   - 工作日有任务 → 推送
+    #   - 周末有会议现场任务 → 推送
+    #   - 周末无会议任务 → 自动跳过不推送
+    # GitHub Actions 定时任务可能有 5-15 分钟延迟，属正常现象
+    - cron: '0 0 * * *'
+  workflow_dispatch: # 允许手动触发测试
+
+jobs:
+  send-reminder:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - run: node send_reminder.js
