@@ -2,7 +2,7 @@
 
 /**
  * 会议每日工作提醒 - GitHub Actions 版
- * 每天 8:00 (北京时间) 自动计算5场会议的待办任务并推送到企业微信群
+ * 周一至周五 8:00 (北京时间) 自动计算5场会议的待办任务并推送到企业微信群
  *
  * 周末任务智能分散：
  * - 会议现场相关任务（会前2天~会后1天）→ 周末照常推送，必须到现场
@@ -308,6 +308,42 @@ function generateReminder(today) {
 }
 
 // ═══════════════════════════════════════════
+// 等待到北京时间 08:00 再发送
+// GitHub Actions 定时任务可能提前或延迟触发
+// 如果触发时北京时间还没到 08:00，就等到 08:00 再发
+// 如果已经过了 08:00（GitHub延迟了），直接发送
+// ═══════════════════════════════════════════
+
+async function waitUntilBeijing8AM() {
+  var now = new Date();
+  // GitHub runner 是 UTC 时区，北京时间 = UTC + 8
+  var beijingHour = (now.getUTCHours() + 8) % 24;
+  var beijingMinute = now.getUTCMinutes();
+  var beijingStr = beijingHour + ':' + String(beijingMinute).padStart(2, '0');
+
+  // 如果已经过了 08:00 北京时间，直接发送
+  if (beijingHour > 8 || (beijingHour === 8 && beijingMinute >= 0)) {
+    console.log('当前北京时间 ' + beijingStr + '，已过 08:00，直接发送');
+    return;
+  }
+
+  // 计算到 08:00 的等待时间（毫秒）
+  var nowMs = (beijingHour * 60 + beijingMinute) * 60 * 1000;
+  var targetMs = 8 * 60 * 60 * 1000;
+  var waitMs = targetMs - nowMs;
+  var waitMin = Math.round(waitMs / 60000);
+
+  console.log('当前北京时间 ' + beijingStr + '，等待 ' + waitMin + ' 分钟到 08:00 再发送...');
+
+  await new Promise(function(resolve) { setTimeout(resolve, waitMs); });
+
+  var now2 = new Date();
+  var bjHour2 = (now2.getUTCHours() + 8) % 24;
+  var bjMin2 = now2.getUTCMinutes();
+  console.log('已到北京时间 ' + bjHour2 + ':' + String(bjMin2).padStart(2, '0') + '，开始发送！');
+}
+
+// ═══════════════════════════════════════════
 // 发送到企业微信
 // ═══════════════════════════════════════════
 
@@ -373,6 +409,9 @@ async function sendWeChatMessage(payload, label) {
 }
 
 async function main() {
+  // 等待到北京时间 08:00 再发送
+  await waitUntilBeijing8AM();
+
   var today = getBeijingToday();
   console.log('今天: ' + today.y + '-' + today.m + '-' + today.d + ' ' + today.dayStr);
 
